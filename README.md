@@ -22,11 +22,23 @@
 
 ## 示例图
 
-下面的写实海底小动物风景图由 Gemini 图片模型以 `4K`、`16:9` 生成：
+下面三张西部牛仔风格的 Tom 海报使用相同主题生成，Skill 会根据当前 API key
+自动发现可用模型并选择对应访问通道。
 
-![写实海底小动物风景图](underwater-baby-animals-4k.jpg)
+### GPT Image 2
 
-下面的白底红苹果图片由本 Skill 自动识别 `gpt-image-2` 并通过 Image2 通道生成。
-请求尺寸为 `1K`、`1:1`，中转实际返回 `1254 × 1254` PNG：
+由 `gpt-image-2` 通过 Image2 通道生成，尺寸为 `1024 × 1536`：
 
-![GPT Image 2 生成的白底红苹果](gpt-image-2-red-apple.png)
+![GPT Image 2 生成的 Tom 西部牛仔海报](tom-western-gpt-image-2.png)
+
+### Gemini 3.1 Flash Image
+
+由 `gemini-3.1-flash-image` 通过 Gemini 原生通道生成，尺寸为 `1696 × 2528`：
+
+![Gemini 3.1 Flash Image 生成的 Tom 西部牛仔海报](tom-western-gemini-3-1-flash.jpg)
+
+### Gemini 3 Pro Image
+
+由 `gemini-3-pro-image` 通过 Gemini 原生通道生成，尺寸为 `1696 × 2528`：
+
+![Gemini 3 Pro Image 生成的 Tom 西部牛仔海报](tom-western-gemini-3-pro.jpg)
