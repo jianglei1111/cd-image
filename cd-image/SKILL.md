@@ -7,7 +7,14 @@ description: Generate or edit images through the CD relay with model discovery, 
 
 Use `scripts/cd_image_cli.py` for the command-line workflow. The gateway is fixed at `https://sp.chedankj.com`; do not change it based on prompt content.
 
-## Credentials and model discovery
+## User-selected model and credentials
+
+For a new request, first show the model menu and ask the user to choose one model (or provide an exact model ID). After the model is selected, ask the user to send the image-group API key. Then pass the selected model explicitly to the CLI and generate or edit. Explicit selection skips model discovery, so a broken catalog endpoint does not block the chosen model. Never silently switch model or channel after an API error.
+
+Available image models (availability depends on the supplied key):
+
+- **Gemini** — `gemini-3.1-flash-image`, `gemini-3-pro-image`, `gemini-2.5-flash-image`
+- **OpenAI Images** — `gpt-image-2.5-sunburst`, `gpt-image-2`, `gpt-image-1.5`, `gpt-image-1`
 
 Require a user-provided image-group key. Never write the key to a file, prompt, history, log, command-line argument, or test report. Pass it through an environment variable for the current process:
 
@@ -15,7 +22,7 @@ Require a user-provided image-group key. Never write the key to a file, prompt, 
 $env:CD_IMAGE_API_KEY="sk-..."
 ```
 
-The `models` command always queries `GET /v1/models` and reports the image models exposed to that key. Automatic routing preserves the existing channel families:
+The optional `models` command queries `GET /v1/models` and reports the image models exposed to that key. Use it only when the user explicitly asks to inspect a key's catalog. Automatic routing remains available when the user selects `auto`:
 
 - `gemini-*-image` uses Gemini `POST /v1beta/models/{model}:generateContent`.
 - `gpt-image-*` uses Image2/OpenAI-compatible `POST /v1/images/generations` or `POST /v1/images/edits`.

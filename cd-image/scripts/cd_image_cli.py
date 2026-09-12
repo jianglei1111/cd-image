@@ -577,10 +577,15 @@ def run_models(args: argparse.Namespace, api_key: str) -> int:
 def run_request(args: argparse.Namespace, api_key: str) -> int:
     if args.count < 1:
         raise CDImageError("count must be at least 1")
-    models = discover_models(api_key, args.timeout, args.retries)
-    model, channel = resolve_model(models, args.model, args.channel)
-    if args.model.lower() != "auto" and model not in models:
-        print("[cd-image] warning: forced model is not present in the key's discovered model list", flush=True)
+    requested_model = (args.model or "auto").strip()
+    if requested_model.lower() != "auto":
+        # An explicit user choice is routed directly. A catalog outage must
+        # not override or block that choice.
+        model, channel = resolve_model([], requested_model, args.channel)
+        print("[cd-image] using explicitly selected model; model discovery skipped", flush=True)
+    else:
+        models = discover_models(api_key, args.timeout, args.retries)
+        model, channel = resolve_model(models, requested_model, args.channel)
     print(f"[cd-image] selected model={model} channel={channel}", flush=True)
     print(f"[cd-image] starting mode={args.command} size={args.size} aspect_ratio={args.aspect_ratio}", flush=True)
     results: list[dict[str, Any]] = []

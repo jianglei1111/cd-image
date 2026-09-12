@@ -2,7 +2,7 @@ interface:
   display_name: "CD-image"
   short_description: "Route image requests to Gemini or Image2 by key."
   brand_color: "#00A6A6"
-  default_prompt: "Use $cd-image to generate or edit an image with the best image model available to my API key."
+  default_prompt: "Use $cd-image. First show me the available image models and ask me to choose one; then ask for my API key and generate or edit with that selected model."
 
 policy:
   allow_implicit_invocation: true
