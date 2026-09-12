@@ -24,6 +24,20 @@ class ModelRoutingTests(unittest.TestCase):
         data = {"models": [{"name": "models/gemini-3-pro-image"}]}
         self.assertEqual(cli.parse_model_ids(data), ["gemini-3-pro-image"])
 
+    def test_model_discovery_merges_formats_and_ignores_invalid_items(self) -> None:
+        data = {
+            "data": [{"id": "models/gpt-image-2.5-sunburst"}, {"id": ""}, None],
+            "models": [{"name": "models/gpt-image-2.5-sunburst"},
+                       {"name": "models/gemini-3-pro-image"}, {"name": 1}],
+        }
+        self.assertEqual(cli.parse_model_ids(data), ["gpt-image-2.5-sunburst", "gemini-3-pro-image"])
+
+    def test_generation_defaults_are_preserved(self) -> None:
+        with patch("sys.argv", ["cd_image_cli.py", "generate", "test prompt"]):
+            args = cli.parse_args()
+        self.assertEqual((args.model, args.channel), ("auto", "auto"))
+        self.assertEqual((args.size, args.aspect_ratio, args.quality, args.count), ("2K", "1:1", "high", 1))
+
     def test_auto_routes_gemini_only_key(self) -> None:
         self.assertEqual(
             cli.resolve_model(["gemini-3-pro-image"], "auto", "auto"),
@@ -34,6 +48,19 @@ class ModelRoutingTests(unittest.TestCase):
         self.assertEqual(
             cli.resolve_model(["gpt-image-2"], "auto", "auto"),
             ("gpt-image-2", "image2"),
+        )
+
+    def test_image2_prefers_25_sunburst_when_available(self) -> None:
+        models = ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-1"]
+        self.assertEqual(
+            cli.resolve_model(models, "auto", "image2"),
+            ("gpt-image-2.5-sunburst", "image2"),
+        )
+
+    def test_image2_preference_is_case_insensitive(self) -> None:
+        self.assertEqual(
+            cli.resolve_model(["GPT-IMAGE-2.5-SUNBURST"], "auto", "image2"),
+            ("GPT-IMAGE-2.5-SUNBURST", "image2"),
         )
 
     def test_auto_prefers_image2_when_both_are_exposed(self) -> None:
@@ -102,6 +129,18 @@ class EndpointRoutingTests(unittest.TestCase):
         self.assertEqual(post.call_args.args[0], f"{cli.BASE_URL}/v1/images/generations")
         self.assertEqual(post.call_args.kwargs["json"]["size"], "1024x1024")
         self.assertEqual(metadata["sent_size"], "1024x1024")
+
+    def test_image25_generation_keeps_high_quality_and_existing_size_mapping(self) -> None:
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
+        response = FakeResponse({"data": [{"b64_json": base64.b64encode(png).decode("ascii")}]})
+        args = self.request_args()
+        args.size = "2K"
+        with patch.object(cli.httpx, "post", return_value=response) as post:
+            cli.request_image2(args, "secret", "gpt-image-2.5-sunburst")
+        self.assertEqual(post.call_args.args[0], f"{cli.BASE_URL}/v1/images/generations")
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual((payload["model"], payload["quality"], payload["size"]),
+                         ("gpt-image-2.5-sunburst", "high", "2048x2048"))
 
     def test_gemini_generation_uses_generate_content_endpoint(self) -> None:
         jpeg = b"\xff\xd8\xff" + b"\x00" * 24

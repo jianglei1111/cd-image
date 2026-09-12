@@ -37,6 +37,7 @@ GEMINI_PREFERENCES = (
     "gemini-2.5-flash-image",
 )
 IMAGE2_PREFERENCES = (
+    "gpt-image-2.5-sunburst",
     "gpt-image-2",
     "gpt-image-1.5",
     "gpt-image-1",

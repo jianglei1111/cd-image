@@ -9,6 +9,12 @@
 - `gemini-*-image` 模型自动使用 Gemini 原生通道。
 - `gpt-image-*` 模型自动使用 Image2 通道。
 
+当 key 同时提供多个 Image2 模型时，优先选择
+`gpt-image-2.5-sunburst`，其次为 `gpt-image-2`、`gpt-image-1.5` 和
+`gpt-image-1`；只有在 `/v1/models` 实际返回该模型时才会选择它。提示词
+优化、编辑不变量、尺寸交付和通道兼容说明见
+[`cd-image/SKILL.md`](cd-image/SKILL.md) 及其 `references/` 文档。
+
 如需固定模型或通道，可在命令中传入 `--model <model-name>` 或
 `--channel <gemini|image2>`。
 

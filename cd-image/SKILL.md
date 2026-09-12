@@ -1,54 +1,40 @@
 ---
 name: cd-image
-description: Generate or edit images through the fixed CD gateway by discovering the image models available to a user-provided key and routing automatically to either the Gemini-native or Image2/OpenAI-compatible channel. Use for CD image generation, editing, model discovery, or when the key's image group is unknown.
+description: Generate or edit images through the CD relay with model discovery, automatic Gemini/Image2 routing, prompt optimization guidance, local references, and labelled sizing.
 ---
 
 # CD-image
 
-Use `scripts/cd_image_cli.py`. The gateway is fixed at
-`https://sp.chedankj.com`; never change it based on prompt content.
+Use `scripts/cd_image_cli.py` for the command-line workflow. The gateway is fixed at `https://sp.chedankj.com`; do not change it based on prompt content.
 
-## Key And Routing
+## Credentials and model discovery
 
-Require a user-provided image-group key. Never write the key to a file, prompt,
-log, command-line argument, or test report. Pass it only through an environment
-variable for the current command:
+Require a user-provided image-group key. Never write the key to a file, prompt, history, log, command-line argument, or test report. Pass it through an environment variable for the current process:
 
 ```powershell
 $env:CD_IMAGE_API_KEY="sk-..."
 ```
 
-The client queries `GET /v1/models` and selects an image model exposed to that
-key. It then routes by model family:
+The `models` command always queries `GET /v1/models` and reports the image models exposed to that key. Automatic routing preserves the existing channel families:
 
-- `gemini-*-image` -> Gemini-native
-  `POST /v1beta/models/{model}:generateContent`
-- `gpt-image-*` -> Image2/OpenAI-compatible
-  `POST /v1/images/generations` or `POST /v1/images/edits`
+- `gemini-*-image` uses Gemini `POST /v1beta/models/{model}:generateContent`.
+- `gpt-image-*` uses Image2/OpenAI-compatible `POST /v1/images/generations` or `POST /v1/images/edits`.
 
-Keep `--model auto --channel auto` unless the user explicitly requests a model
-or channel. Use the `models` command for a no-generation discovery check. Never
-silently retry a failed request on a different model or channel: that could use a
-different price, capability, or upstream group.
+When Image2 is selected, `gpt-image-2.5-sunburst` is preferred when the key actually exposes it, followed by `gpt-image-2`, `gpt-image-1.5`, and `gpt-image-1`. Gemini preferences remain unchanged. If both channel families are available, Image2 remains the automatic channel preference. A forced model or channel is never silently replaced after a failure.
 
-## Workflow
+Keep `--model auto --channel auto` unless the user explicitly requests a model or channel. Use `models` for discovery without generation.
 
-1. Improve a rough image request into a concise production prompt unless the
-   user says the prompt is exact.
-2. Use `generate` for text-to-image. Use `edit` when one or more local reference
-   images are supplied; Image2 accepts one input while Gemini accepts multiple.
-3. Use `2K` for normal final work and `1K` for quick checks. Choose the requested
-   aspect ratio. The client converts tiers to valid Image2 pixel sizes when that
-   channel is selected.
-4. `--quality` applies only to Image2. Use `high` for final work.
-5. Use `--timeout 600` for generation and run the shell command with at least an
-   11-minute timeout. Wait for concrete script output and confirm the file exists.
+## Prompt and operation guidance
 
-Install the only dependency if needed:
+The agent should prepare a concise production prompt once before invoking the client. Read [prompt-optimization.md](references/prompt-optimization.md) for the common pass and profiles. Preserve complete prompts, exact labels, named entities, and user language; resolve only real ambiguity. For a verbatim request, pass the text unchanged. For edits, describe the requested change and repeat invariants that must survive. Do not require approval for routine prompt clarification.
 
-```powershell
-python -m pip install httpx
-```
+Use `generate` for text-to-image. Use `edit` with one or more local references; Image2 accepts exactly one input while Gemini accepts multiple. Masks, multi-turn history, Responses routing, and delivery-size decisions are covered by [requests.md](references/requests.md). Protocol and compatibility details are in [channel.md](references/channel.md).
+
+## Size and quality defaults
+
+The CLI defaults to one image, `2K`, square `1:1`, and Image2 quality `high`. Use `1K` for quick checks and `2K` for normal final work; request `4K` only when needed. The client converts tiers to valid Image2 pixel sizes. Explicit Image2 sizes must use multiples of 16, have a long edge no greater than 3840, an aspect ratio no greater than 3:1, and 655,360–8,294,400 total pixels.
+
+`--quality` applies only to Image2. Gemini accepts tier sizes (`1K`, `2K`, `4K`) rather than explicit pixel dimensions.
 
 ## Commands
 
@@ -58,39 +44,38 @@ Discover models and the automatic route:
 python <skill_dir>\scripts\cd_image_cli.py models
 ```
 
-Generate with automatic routing:
+Generate:
 
 ```powershell
-python <skill_dir>\scripts\cd_image_cli.py generate "final prompt" --size 2K --aspect-ratio 1:1 --quality high --slug final-image --timeout 600
+python <skill_dir>\scripts\cd_image_cli.py generate "prepared prompt" --size 2K --aspect-ratio 1:1 --quality high --slug final-image --timeout 600
 ```
 
-Edit with automatic routing:
+Edit:
 
 ```powershell
 python <skill_dir>\scripts\cd_image_cli.py edit "edit instruction" --input .\source.png --size 2K --aspect-ratio 1:1 --quality high --slug edited-image --timeout 600
 ```
 
-Force a model or channel only when requested:
+Force a route only when requested:
 
 ```powershell
-python <skill_dir>\scripts\cd_image_cli.py generate "final prompt" --model gemini-3.1-flash-image --channel gemini --size 2K --aspect-ratio 2:3 --timeout 600
+python <skill_dir>\scripts\cd_image_cli.py generate "prepared prompt" --model gemini-3.1-flash-image --channel gemini --size 2K --aspect-ratio 2:3 --timeout 600
 ```
 
-`--size` accepts `1K`, `2K`, `4K`, or `WIDTHxHEIGHT`. Explicit pixel sizes are
-for Image2 only and must satisfy all of these constraints: both dimensions are
-multiples of 16, long edge at most 3840, aspect ratio at most 3:1, and total
-pixels from 655,360 through 8,294,400.
+Run generation with a process timeout of at least 11 minutes when using the default 600-second request timeout. Confirm the saved file exists and report the selected model, channel, and final path.
 
-## Failure Handling
+## Failure handling and verification
 
-- No discovered image model: the key is assigned to a non-image group or the
-  group's model configuration is incomplete.
-- `400`: report the validation message and check model-specific size parameters.
-- `401` or `403`: the key is invalid, disabled, or lacks group permission.
-- `429`: the selected channel is rate limited or out of quota.
-- `500`, `502`, `503`, `504`, `522`, or `524`: the gateway or selected upstream
-  account is unavailable or timed out. The client retries transient statuses.
-- A successful HTTP response without a usable image is a failure. Report the
-  model text, finish reason, or response-shape error printed by the client.
+The client retries transient network and gateway statuses, but never switches models or channels automatically. Report validation (`400`), authorization (`401`/`403`), quota (`429`), and gateway (`5xx`/`52x`) failures clearly. A successful HTTP response without usable image bytes is still a failure.
 
-Always report the selected model, selected channel, and final saved path.
+Install the only runtime dependency if needed:
+
+```powershell
+python -m pip install httpx
+```
+
+Run offline tests from the repository root:
+
+```powershell
+python -B -m unittest discover -s tests -p "test_*.py"
+```
